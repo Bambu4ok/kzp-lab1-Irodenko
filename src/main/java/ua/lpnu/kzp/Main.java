@@ -18,7 +18,7 @@ public final class Main {
         }
 
         if (args.length > 0 && "--version".equals(args[0])) {
-            System.out.println("Версія: 1.0.0");
+            System.out.println("Версія: 2.0.0");
             return;
         }
 
@@ -47,11 +47,8 @@ public final class Main {
     }
 
     public static String processData(List<String> lines) {
+        List<UtilityReading> readings = new ArrayList<>();
         List<String> errors = new ArrayList<>();
-        int validCount = 0;
-        double totalConsumption = 0.0;
-        double totalCost = 0.0;
-        double maxConsumption = Double.NEGATIVE_INFINITY;
 
         for (int i = 0; i < lines.size(); i++) {
             String line = lines.get(i).trim();
@@ -59,46 +56,30 @@ public final class Main {
                 continue;
             }
 
-            String[] fields = line.split(";", -1);
-            if (fields.length != 4) {
-                errors.add(String.format(Locale.ROOT, "Рядок %d: очікується 4 поля, отримано %d", i + 1, fields.length));
-                continue;
-            }
-
-            if (fields[0].isBlank() || fields[2].isBlank()) {
-                errors.add(String.format(Locale.ROOT, "Рядок %d: порожня назва лічильника або дата", i + 1));
-                continue;
-            }
-
             try {
-                double value = Double.parseDouble(fields[1].trim());
-                double tariff = Double.parseDouble(fields[3].trim());
-
-                if (value < 0 || tariff < 0) {
-                    errors.add(String.format(Locale.ROOT, "Рядок %d: значення споживання або тарифу від'ємне", i + 1));
-                    continue;
-                }
-
-                validCount++;
-                totalConsumption += value;
-                totalCost += (value * tariff);
-                maxConsumption = Math.max(maxConsumption, value);
-
-            } catch (NumberFormatException e) {
-                errors.add(String.format(Locale.ROOT, "Рядок %d: помилка формату числа", i + 1));
+                UtilityReading reading = UtilityReading.fromCsv(line);
+                readings.add(reading);
+            } catch (IllegalArgumentException e) {
+                errors.add(String.format(Locale.ROOT, "Рядок %d: %s", i + 1, e.getMessage()));
             }
         }
 
-        if (validCount == 0) {
-            maxConsumption = 0.0;
-        }
+        int validCount = readings.size();
+        double totalConsumption = readings.stream().mapToDouble(UtilityReading::getConsumption).sum();
+        double totalCost = readings.stream().mapToDouble(UtilityReading::calculateCost).sum();
+        double maxConsumption = readings.stream()
+                .mapToDouble(UtilityReading::getConsumption)
+                .max()
+                .orElse(0.0);
+
+        UtilitySummary summary = new UtilitySummary(validCount, totalConsumption, totalCost, maxConsumption);
 
         StringBuilder sb = new StringBuilder();
         sb.append("=== ЗВІТ ПО КОМУНАЛЬНИХ ПОКАЗНИКАХ ===\n");
-        sb.append(String.format(Locale.ROOT, "1. Кількість коректних записів: %d%n", validCount));
-        sb.append(String.format(Locale.ROOT, "2. Сумарне споживання: %.2f%n", totalConsumption));
-        sb.append(String.format(Locale.ROOT, "3. Загальна вартість: %.2f грн%n", totalCost));
-        sb.append(String.format(Locale.ROOT, "4. Найбільше споживання: %.2f%n", maxConsumption));
+        sb.append(String.format(Locale.ROOT, "1. Кількість коректних записів: %d%n", summary.validCount()));
+        sb.append(String.format(Locale.ROOT, "2. Сумарне споживання: %.2f%n", summary.totalConsumption()));
+        sb.append(String.format(Locale.ROOT, "3. Загальна вартість: %.2f грн%n", summary.totalCost()));
+        sb.append(String.format(Locale.ROOT, "4. Найбільше споживання: %.2f%n", summary.maxConsumption()));
         sb.append(String.format(Locale.ROOT, "Помилок/пропущено рядків: %d%n", errors.size()));
 
         if (!errors.isEmpty()) {
