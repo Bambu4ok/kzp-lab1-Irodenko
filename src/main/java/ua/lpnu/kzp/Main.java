@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Locale;
 
 public final class Main {
-
     private Main() {
     }
 
@@ -16,12 +15,10 @@ public final class Main {
             System.out.println("Використання: java -jar lab01.jar [--help] [--version] [--input <файл>] [--output <файл>]");
             return;
         }
-
         if (args.length > 0 && "--version".equals(args[0])) {
-            System.out.println("Версія: 2.0.0");
+            System.out.println("Версія: 3.0.0");
             return;
         }
-
         Path inputPath = Path.of("data", "input.csv");
         Path outputPath = Path.of("out", "report.txt");
 
@@ -37,10 +34,8 @@ public final class Main {
         try {
             List<String> lines = FileReport.readLines(inputPath);
             String report = processData(lines);
-
             System.out.print(report);
             FileReport.writeReport(outputPath, report);
-
         } catch (IOException e) {
             System.err.printf(Locale.ROOT, "Помилка при роботі з файлом: %s%n", e.getMessage());
         }
@@ -55,7 +50,6 @@ public final class Main {
             if (line.isEmpty()) {
                 continue;
             }
-
             try {
                 UtilityReading reading = UtilityReading.fromCsv(line);
                 readings.add(reading);

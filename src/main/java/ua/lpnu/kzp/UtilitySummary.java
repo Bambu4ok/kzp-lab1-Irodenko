@@ -1,5 +1,8 @@
 package ua.lpnu.kzp;
 
+/**
+ * Record для підсумкової статистики.
+ */
 public record UtilitySummary(
         int validCount,
         double totalConsumption,
