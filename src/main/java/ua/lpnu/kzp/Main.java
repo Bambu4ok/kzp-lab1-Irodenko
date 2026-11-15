@@ -3,10 +3,17 @@ package ua.lpnu.kzp;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.DoubleSummaryStatistics;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 public final class Main {
+    private static final double CONSUMPTION_THRESHOLD = 100.0;
+    private static final int TOP_LIMIT = 5;
+
     private Main() {
     }
 
@@ -16,7 +23,7 @@ public final class Main {
             return;
         }
         if (args.length > 0 && "--version".equals(args[0])) {
-            System.out.println("Версія: 3.0.0");
+            System.out.println("Версія: 4.0.0");
             return;
         }
         Path inputPath = Path.of("data", "input.csv");
@@ -51,20 +58,19 @@ public final class Main {
                 continue;
             }
             try {
-                UtilityReading reading = UtilityReading.fromCsv(line);
-                readings.add(reading);
+                readings.add(UtilityReading.fromCsv(line));
             } catch (IllegalArgumentException e) {
                 errors.add(String.format(Locale.ROOT, "Рядок %d: %s", i + 1, e.getMessage()));
             }
         }
 
-        int validCount = readings.size();
-        double totalConsumption = readings.stream().mapToDouble(UtilityReading::getConsumption).sum();
-        double totalCost = readings.stream().mapToDouble(UtilityReading::calculateCost).sum();
-        double maxConsumption = readings.stream()
-                .mapToDouble(UtilityReading::getConsumption)
-                .max()
-                .orElse(0.0);
+        DoubleSummaryStatistics stats = UtilityReport.consumptionStatistics(readings);
+        int validCount = (int) stats.getCount();
+        double totalConsumption = stats.getSum();
+        double maxConsumption = validCount > 0 ? stats.getMax() : 0.0;
+        double totalCost = readings.stream()
+                .mapToDouble(UtilityReading::calculateCost)
+                .sum();
 
         UtilitySummary summary = new UtilitySummary(validCount, totalConsumption, totalCost, maxConsumption);
 
@@ -82,6 +88,26 @@ public final class Main {
                 sb.append(" - ").append(err).append("\n");
             }
         }
+
+        sb.append("\n=== ПОТОКОВА АНАЛІТИКА (STREAM API) ===\n");
+        List<UtilityReading> aboveThreshold = UtilityReport.filterAboveThreshold(readings, CONSUMPTION_THRESHOLD);
+        sb.append(String.format(Locale.ROOT, "Записів понад поріг (%.2f): %d%n", CONSUMPTION_THRESHOLD, aboveThreshold.size()));
+
+        Map<String, Double> byMeter = UtilityReport.sumConsumptionByMeter(readings);
+        String groupedStr = byMeter.entrySet().stream()
+                .map(e -> String.format(Locale.ROOT, "%s=%.2f", e.getKey(), e.getValue()))
+                .collect(Collectors.joining(", ", "{", "}"));
+        sb.append(String.format(Locale.ROOT, "Сума за лічильниками: %s%n", groupedStr));
+
+        List<UtilityReading> top5 = UtilityReport.topReadingsByConsumption(readings, TOP_LIMIT);
+        String topStr = top5.stream()
+                .map(r -> String.format(Locale.ROOT, "%s (%.2f від %s)", r.getName(), r.getConsumption(), r.getDate()))
+                .collect(Collectors.joining("; "));
+        sb.append(String.format(Locale.ROOT, "Топ-%d за споживанням: [%s]%n", TOP_LIMIT, topStr));
+
+        Optional<UtilityReading> waterSearch = UtilityReport.findFirstByMeter(readings, "Вода");
+        sb.append(String.format(Locale.ROOT, "Пошук 'Вода': %s%n",
+                waterSearch.map(UtilityReading::toString).orElse("Не знайдено")));
 
         return sb.toString();
     }
