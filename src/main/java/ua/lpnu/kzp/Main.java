@@ -1,7 +1,10 @@
 package ua.lpnu.kzp;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.DoubleSummaryStatistics;
 import java.util.List;
@@ -23,7 +26,7 @@ public final class Main {
             return;
         }
         if (args.length > 0 && "--version".equals(args[0])) {
-            System.out.println("Версія: 4.0.0");
+            System.out.println("Версія: 5.0.0");
             return;
         }
         Path inputPath = Path.of("data", "input.csv");
@@ -108,6 +111,34 @@ public final class Main {
         Optional<UtilityReading> waterSearch = UtilityReport.findFirstByMeter(readings, "Вода");
         sb.append(String.format(Locale.ROOT, "Пошук 'Вода': %s%n",
                 waterSearch.map(UtilityReading::toString).orElse("Не знайдено")));
+
+        // Блок ЛР5: Repository<T> та рефлексивний CSV-експорт / round-trip
+        sb.append("\n=== СХОВИЩЕ ТА CSV-ЕКСПОРТ (ЛР5) ===\n");
+        Repository<UtilityReadingRecord> repo = new Repository<>();
+        for (UtilityReading r : readings) {
+            repo.add(new UtilityReadingRecord(
+                    r.getName(),
+                    LocalDate.parse(r.getDate()),
+                    r.getConsumption(),
+                    r.getTariff()
+            ));
+        }
+
+        Path exportPath = Path.of("out", "exported_readings.csv");
+        try {
+            CsvExporter.write(exportPath, UtilityReadingRecord.class, repo.all());
+            String csvContent = Files.readString(exportPath, StandardCharsets.UTF_8);
+            List<List<String>> parsedRows = CsvParser.parseDocument(csvContent);
+            List<UtilityReadingRecord> restored = new ArrayList<>();
+            for (int i = 1; i < parsedRows.size(); i++) {
+                restored.add(UtilityReadingRecord.fromFields(parsedRows.get(i)));
+            }
+            sb.append(String.format(Locale.ROOT, "Записів у Repository<UtilityReadingRecord>: %d%n", repo.all().size()));
+            sb.append(String.format(Locale.ROOT, "CSV-файл: %s (рядків із заголовком: %d)%n", exportPath, parsedRows.size()));
+            sb.append(String.format(Locale.ROOT, "Round-trip відновлення: %b%n", repo.all().equals(restored)));
+        } catch (DataStorageException | IOException e) {
+            sb.append(String.format(Locale.ROOT, "Помилка CSV-експорту: %s%n", e.getMessage()));
+        }
 
         return sb.toString();
     }
