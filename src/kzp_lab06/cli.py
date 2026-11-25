@@ -1,4 +1,4 @@
-"""Інтерфейс командного рядка (CLI) для обробки комунальних показників."""
+"""Інтерфейс командного рядка (CLI) для генерації звіту з CSV."""
 
 from __future__ import annotations
 
@@ -6,10 +6,19 @@ import argparse
 import sys
 from pathlib import Path
 
-from kzp_lab06.analysis import DEFAULT_THRESHOLD, analyze_readings
-from kzp_lab06.errors import DataError
-from kzp_lab06.loader import load_readings
-from kzp_lab06.reporting import write_report
+from .analysis import DEFAULT_THRESHOLD, make_summary
+from .errors import DataError
+from .loader import load_records
+from .reporting import format_report, write_report
+
+
+def _configure_stdio_utf8() -> None:
+    """Гарантує коректне виведення кирилиці у stdout/stderr на Windows."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+        except (AttributeError, ValueError):
+            pass
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -24,22 +33,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--threshold",
         type=float,
         default=DEFAULT_THRESHOLD,
-        help=f"Поріг споживання value > threshold (типово {DEFAULT_THRESHOLD})",
+        help=f"Поріг value > threshold (типово {DEFAULT_THRESHOLD})",
     )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     """Точка входу CLI: повертає 0 при успіху та 2 при очікуваній помилці даних."""
+    _configure_stdio_utf8()
     parser = build_parser()
     args = parser.parse_args(argv)
 
     try:
-        readings = load_readings(args.input_csv)
-        metrics = analyze_readings(readings, threshold=args.threshold)
-        write_report(args.output_report, metrics)
-    except DataError as exc:
-        print(f"Помилка вхідних даних: {exc}", file=sys.stderr)
+        records = load_records(args.input_csv)
+        summary = make_summary(records, threshold=args.threshold)
+        report_text = format_report(summary)
+        write_report(args.output_report, report_text)
+    except DataError as error:
+        print(f"Помилка даних: {error}", file=sys.stderr)
         return 2
 
     return 0
