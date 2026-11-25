@@ -29,11 +29,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("input_csv", type=Path, help="Шлях до вхідного CSV-файлу")
     parser.add_argument("output_report", type=Path, help="Шлях до вихідного текстового звіту")
-    parser.add_argument(
+   parser.add_argument(
         "--threshold",
         type=float,
         default=DEFAULT_THRESHOLD,
-        help=f"Поріг споживання для відбору value > threshold (за замовчуванням {DEFAULT_THRESHOLD})",
+        help=(
+            f"Поріг споживання для відбору value > threshold "
+            f"(за замовчуванням {DEFAULT_THRESHOLD})"
+        ),
     )
     return parser
 
