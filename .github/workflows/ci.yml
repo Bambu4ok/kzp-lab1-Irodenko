@@ -1,8 +1,8 @@
-name: Python checks
+﻿name: Python checks
 
 on:
   push:
-    branches: [main, lab06]
+    branches: [main, lab07]
   pull_request:
     branches: [main]
 
